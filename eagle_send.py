@@ -123,7 +123,7 @@ class EagleSend:
         """Normalize separators to newlines and replace literal BREAK with newlines."""
         if not isinstance(prompt, str):
             return ""
-        text = prompt.replace("\r\n", "\n").replace("\r", "\n")
+        normalized = prompt.replace("\r\n", "\n").replace("\r", "\n")
         for separator in [",", "，", "、", ";", "；", "|", "｜", "/", "／"]:
             normalized = normalized.replace(separator, "\n")
         text = re.sub(r"(?i)\bBREAK\b", "\n", text)
