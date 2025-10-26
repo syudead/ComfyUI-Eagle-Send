@@ -78,7 +78,7 @@ class EagleSend:
             pil_images.append(pil_image)
         return pil_images
 
-    def _save_images_output(self, pil_images: List[Any], filename_prefix: str, prompt=None, extra_pnginfo=None) -> List[str]:
+    def _save_images_output(self, pil_images: List[Any], filename_prefix: str, prompt: str | None = None, extra_pnginfo=None) -> List[str]:
         paths: List[str] = []
         if not pil_images:
             return paths
@@ -88,13 +88,14 @@ class EagleSend:
             filename_prefix, output_dir, width, height
         )
         has_batch_token = "%batch_num%" in filename
-        # Prepare PNG metadata similar to SaveImage node
+        # Prepare PNG metadata similar to SaveImage node (embed workflow + human prompt)
         pnginfo = None
         try:
             from PIL.PngImagePlugin import PngInfo  # type: ignore
             pnginfo = PngInfo()
-            if prompt is not None:
-                pnginfo.add_text("prompt", json.dumps(prompt))
+            # Embed human-readable prompt for external tools (e.g., Civitai)
+            if isinstance(prompt, str) and prompt.strip():
+                pnginfo.add_text("parameters", prompt)
             if extra_pnginfo is not None:
                 for key in extra_pnginfo:
                     pnginfo.add_text(key, json.dumps(extra_pnginfo[key]))
@@ -197,8 +198,7 @@ class EagleSend:
         self,
         images,
         filename_prefix: str,
-        tags_text: str,
-        prompt=None,
+        prompt: str,
         extra_pnginfo=None,
     ):
         pil_images = self._tensor_to_pil_list(images)
@@ -210,7 +210,7 @@ class EagleSend:
         host = os.environ.get("EAGLE_API_HOST", "http://127.0.0.1:41595")
         endpoint_path = "/api/item/addFromPaths"
 
-        tags = self._prompt_to_tags(tags_text)
+        tags = self._prompt_to_tags(prompt)
         code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths, tags)
         debug_info = {
             "tags_count": len(tags),
