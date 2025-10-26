@@ -116,6 +116,100 @@ class EagleSend:
                 break
         return tags
 
+    # --- Workflow parsing (fixed node definitions) ---
+    MODEL_NODE_TYPES = {"CheckpointLoaderSimple", "CheckpointLoader"}
+    LORA_NODE_TYPES = {"LoraLoader", "LoraLoaderModelOnly"}
+
+    def _as_nodes_list(self, workflow_obj: Any) -> List[Dict[str, Any]]:
+        if isinstance(workflow_obj, list):
+            return [x for x in workflow_obj if isinstance(x, dict)]
+        if isinstance(workflow_obj, dict):
+            nodes = workflow_obj.get("nodes")
+            if isinstance(nodes, list):
+                return [x for x in nodes if isinstance(x, dict)]
+        return []
+
+    def _find_str_in_widgets(self, widgets_values: Any, exts: List[str]) -> str:
+        try:
+            if isinstance(widgets_values, list):
+                for v in widgets_values:
+                    if isinstance(v, str):
+                        lv = v.lower()
+                        if any(lv.endswith(e) for e in exts):
+                            return v
+        except Exception:
+            pass
+        return ""
+
+    def _value_from_inputs(self, node: Dict[str, Any], key: str) -> Any:
+        try:
+            inputs = node.get("inputs", {}) or {}
+            if key in inputs:
+                return inputs[key]
+        except Exception:
+            pass
+        return None
+
+    def _normalize_name_drop_ext(self, name: str) -> str:
+        if not isinstance(name, str):
+            return ""
+        base = name.strip()
+        for ext in (".safetensors", ".ckpt", ".pth", ".pt"):
+            if base.lower().endswith(ext):
+                base = base[: -len(ext)]
+                break
+        return base.strip()
+
+    def _parse_workflow_resources(self, extra_pnginfo: Any) -> Dict[str, Any]:
+        result = {"model_name": "", "loras": []}
+        if not isinstance(extra_pnginfo, dict):
+            return result
+        wf = extra_pnginfo.get("workflow")
+        if isinstance(wf, str):
+            try:
+                wf = json.loads(wf)
+            except Exception:
+                wf = None
+        nodes = self._as_nodes_list(wf)
+        if not nodes:
+            return result
+
+        exts = [".safetensors", ".ckpt", ".pth", ".pt"]
+        model_found = False
+        lora_names: List[str] = []
+
+        for node in nodes:
+            t = node.get("type")
+            if t in self.MODEL_NODE_TYPES and not model_found:
+                v = self._value_from_inputs(node, "ckpt_name")
+                if isinstance(v, str) and v.strip():
+                    result["model_name"] = self._normalize_name_drop_ext(v)
+                    model_found = True
+                else:
+                    name = self._find_str_in_widgets(node.get("widgets_values"), exts)
+                    if name:
+                        result["model_name"] = self._normalize_name_drop_ext(name)
+                        model_found = True
+            elif t in self.LORA_NODE_TYPES:
+                v = self._value_from_inputs(node, "lora_name")
+                name = ""
+                if isinstance(v, str) and v.strip():
+                    name = v
+                else:
+                    name = self._find_str_in_widgets(node.get("widgets_values"), exts)
+                name = self._normalize_name_drop_ext(name)
+                if name:
+                    lora_names.append(name)
+
+        seen = set()
+        uniq_loras = []
+        for n in lora_names:
+            if n not in seen:
+                uniq_loras.append(n)
+                seen.add(n)
+        result["loras"] = uniq_loras
+        return result
+
 
     def _save_images_output(self, pil_images: List[Any], filename_prefix: str, prompt: str | None, extra_pnginfo: Dict[str, Any] | None) -> List[str]:
         paths: List[str] = []
@@ -223,3 +317,4 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "EagleSend": "Eagle: Send Images",
 }
+
