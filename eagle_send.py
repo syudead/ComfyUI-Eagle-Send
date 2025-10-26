@@ -318,3 +318,4 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "EagleSend": "Eagle: Send Images",
 }
 
+
