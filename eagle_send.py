@@ -119,11 +119,7 @@ class EagleSend:
                 return int(getattr(exc, "code", 0) or 0), text
             return 0, str(exc)
 
-    def _normalize_prompt(self, prompt: str) -> str:
-        """Normalize separators to newlines and replace literal BREAK with newlines."""
-        if not isinstance(prompt, str):
-            return ""
-        normalized = prompt.replace("\r\n", "\n").replace("\r", "\n")
+    def _normalize_prompt(self, prompt: str) -> str:\n        """Normalize separators to newlines and replace literal BREAK with newlines."""\n        if not isinstance(prompt, str):\n            return ""\n        normalized = prompt.replace("\r\n", "\n").replace("\r", "\n")\n        separators = [",", "，", "、", ";", "；", "|", "｜", "/", "／"]\n        for separator in separators:\n            normalized = normalized.replace(separator, "\n")\n        normalized = re.sub(r"(?i)\\bBREAK\\b", "\n", normalized)\n        return normalized\n\n    \n        normalized = prompt.replace("\r\n", "\n").replace("\r", "\n")
         for separator in [",", "，", "、", ";", "；", "|", "｜", "/", "／"]:
             normalized = normalized.replace(separator, "\n")
         text = re.sub(r"(?i)\bBREAK\b", "\n", text)
@@ -216,4 +212,5 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "EagleSend": "Eagle: Send Images",
 }
+
 
