@@ -29,8 +29,12 @@ class EagleSend:
             "required": {
                 "images": ("IMAGE",),
                 "filename_prefix": ("STRING", {"default": "ComfyUI/EagleSend"}),
-                "prompt": ("STRING", {"default": "", "multiline": True, "forceInput": True}),
-            }
+                "tags_text": ("STRING", {"default": "", "multiline": True, "forceInput": True}),
+            },
+            "hidden": {
+                "prompt": "PROMPT",
+                "extra_pnginfo": "EXTRA_PNGINFO",
+            },
         }
 
     RETURN_TYPES = ("IMAGE", "STRING")
@@ -75,7 +79,7 @@ class EagleSend:
             pil_images.append(pil_image)
         return pil_images
 
-    def _save_images_output(self, pil_images: List[Any], filename_prefix: str) -> List[str]:
+    def _save_images_output(self, pil_images: List[Any], filename_prefix: str, prompt=None, extra_pnginfo=None) -> List[str]:
         paths: List[str] = []
         if not pil_images:
             return paths
@@ -85,6 +89,19 @@ class EagleSend:
             filename_prefix, output_dir, width, height
         )
         has_batch_token = "%batch_num%" in filename
+        # Prepare PNG metadata similar to SaveImage node
+        pnginfo = None
+        try:
+            from PIL.PngImagePlugin import PngInfo  # type: ignore
+            pnginfo = PngInfo()
+            if prompt is not None:
+                pnginfo.add_text("prompt", json.dumps(prompt))
+            if extra_pnginfo is not None:
+                for key in extra_pnginfo:
+                    pnginfo.add_text(key, json.dumps(extra_pnginfo[key]))
+        except Exception:
+            pnginfo = None
+
         for batch_number, pil_image in enumerate(pil_images):
             if has_batch_token:
                 filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
@@ -94,7 +111,10 @@ class EagleSend:
                 cur_counter = counter + batch_number
             file_name = f"{filename_with_batch_num}_{cur_counter:05}_.png"
             save_path = os.path.join(full_output_folder, file_name)
-            pil_image.save(save_path, format="PNG")
+            if pnginfo is not None:
+                pil_image.save(save_path, format="PNG", pnginfo=pnginfo)
+            else:
+                pil_image.save(save_path, format="PNG")
             paths.append(save_path)
         return paths
 
@@ -143,8 +163,8 @@ class EagleSend:
         token_str = re.sub(r"\s+", " ", token_str)
         return token_str
 
-    def _prompt_to_tags(self, prompt: str) -> List[str]:
-        normalized = self._normalize_prompt(prompt)
+    def _prompt_to_tags(self, text: str) -> List[str]:
+        normalized = self._normalize_prompt(text)
         tags: List[str] = []
         seen_tags: set[str] = set()
         for raw_token in normalized.split("\n"):
@@ -179,18 +199,20 @@ class EagleSend:
         self,
         images,
         filename_prefix: str,
-        prompt: str,
+        tags_text: str,
+        prompt=None,
+        extra_pnginfo=None,
     ):
         pil_images = self._tensor_to_pil_list(images)
         saved_paths: List[str] = []
         if pil_images:
-            saved_paths = self._save_images_output(pil_images, filename_prefix)
+            saved_paths = self._save_images_output(pil_images, filename_prefix, prompt=prompt, extra_pnginfo=extra_pnginfo)
 
         # Hardcoded Eagle API config
         host = os.environ.get("EAGLE_API_HOST", "http://127.0.0.1:41595")
         endpoint_path = "/api/item/addFromPaths"
 
-        tags = self._prompt_to_tags(prompt)
+        tags = self._prompt_to_tags(tags_text)
         code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths, tags)
         debug_info = {
             "tags_count": len(tags),
