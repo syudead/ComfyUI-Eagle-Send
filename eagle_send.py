@@ -124,8 +124,8 @@ class EagleSend:
         if not isinstance(prompt, str):
             return ""
         text = prompt.replace("\r\n", "\n").replace("\r", "\n")
-        for sep in [",", "，", "、", ";", "；", "|", "｜", "/", "／"]:
-            text = text.replace(sep, "\n")
+        for separator in [",", "，", "、", ";", "；", "|", "｜", "/", "／"]:
+            normalized = normalized.replace(separator, "\n")
         text = re.sub(r"(?i)\bBREAK\b", "\n", text)
         return token_strext
 
@@ -147,14 +147,14 @@ class EagleSend:
         return token_str
 
     def _prompt_to_tags(self, prompt: str) -> List[str]:
-        text = self._normalize_prompt(prompt)
+        normalized = self._normalize_prompt(prompt)
         tags: List[str] = []
-        seen: set[str] = set()
-        for raw in text.split("\n"):
-            tag = self._clean_tag(raw)
-            if tag and tag not in seen:
-                tags.append(tag)
-                seen.add(tag)
+        seen_tags: set[str] = set()
+        for raw_token in normalized.split("\n"):
+            cleaned_tag = self._clean_tag(raw_token)
+            if cleaned_tag and cleaned_tag not in seen_tags:
+                tags.append(cleaned_tag)
+                seen_tags.add(cleaned_tag)
             if len(tags) >= 128:
                 break
         return token_strags
