@@ -3,6 +3,8 @@ import os
 import json
 import tempfile
 from typing import List, Tuple, Any, Dict
+import time
+import folder_paths
 
 try:
     import torch
@@ -30,6 +32,7 @@ class EagleSend:
             "required": {
                 "images": ("IMAGE",),
                 "host": ("STRING", {"default": os.environ.get("EAGLE_API_HOST", "http://127.0.0.1:41595")}),
+                "filename_prefix": ("STRING", {"default": "ComfyUI/EagleSend"}),
                 "folder_id": ("STRING", {"default": ""}),
                 "tags": ("STRING", {"default": ""}),
                 "name": ("STRING", {"default": ""}),
@@ -88,14 +91,22 @@ class EagleSend:
             imgs.append(pil)
         return imgs
 
-    def _save_images_temp(self, pil_images: List[Any]) -> Tuple[str, List[str]]:
-        temp_dir = tempfile.mkdtemp(prefix="comfyui_eagle_")
+    def _save_images_output(self, pil_images: List[Any], filename_prefix: str) -> List[str]:
         paths: List[str] = []
-        for idx, im in enumerate(pil_images):
-            p = os.path.join(temp_dir, f"image_{idx+1:03d}.png")
-            im.save(p, format="PNG")
-            paths.append(p)
-        return temp_dir, paths
+        if not pil_images:
+            return paths
+        output_dir = folder_paths.get_output_directory()
+        w, h = pil_images[0].size
+        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
+            filename_prefix, output_dir, w, h
+        )
+        for batch_number, im in enumerate(pil_images):
+            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+            file = f"{filename_with_batch_num}_{counter:05}_.png"
+            save_path = os.path.join(full_output_folder, file)
+            im.save(save_path, format="PNG")
+            paths.append(save_path)
+        return paths
 
     def _post_json(self, url: str, payload: Dict[str, Any], headers: Dict[str, str]) -> Tuple[int, str]:
         data = json.dumps(payload).encode("utf-8")
@@ -170,6 +181,7 @@ class EagleSend:
         self,
         images,
         host: str,
+        filename_prefix: str,
         folder_id: str,
         tags: str,
         name: str,
@@ -181,10 +193,9 @@ class EagleSend:
         dry_run: bool,
     ):
         pil_images = self._tensor_to_pil_list(images)
-        temp_dir = ""
         saved_paths: List[str] = []
         if pil_images:
-            temp_dir, saved_paths = self._save_images_temp(pil_images)
+            saved_paths = self._save_images_output(pil_images, filename_prefix)
 
         tag_list: List[str] = []
         if isinstance(tags, str) and tags.strip():
@@ -211,16 +222,7 @@ class EagleSend:
             code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths, meta, api_token)
             resp_text = f"HTTP {code}: {resp_text}"
 
-        # Cleanup temp files if requested
-        if not keep_temp and temp_dir and os.path.isdir(temp_dir):
-            try:
-                for p in saved_paths:
-                    if os.path.exists(p):
-                        os.remove(p)
-                os.rmdir(temp_dir)
-            except Exception:
-                # Best-effort cleanup
-                pass
+        # No cleanup: images saved to output directory like SaveImage node
 
         return (images, resp_text)
 
