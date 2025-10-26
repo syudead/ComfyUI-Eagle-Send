@@ -201,7 +201,8 @@ class EagleSend:
 
         tags = self._prompt_to_tags(prompt)
         code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths, tags)
-        resp_text = f"HTTP {code}: {resp_text}"
+        debug_info = {"tags_count": len(tags), "tags_preview": tags[:10]}
+        resp_text = json.dumps({"debug": debug_info, "http": code, "body": resp_text}, ensure_ascii=False)
 
         # No cleanup: images saved to output directory like SaveImage node
 
@@ -215,3 +216,4 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "EagleSend": "Eagle: Send Images",
 }
+
