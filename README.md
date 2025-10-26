@@ -6,7 +6,8 @@ ComfyUI custom node to send generated images to Eagle (https://eagle.cool/) via 
 Features
 - Saves images to ComfyUI `output/` using the same naming as Save Image
 - Sends one or more saved image paths to Eagle via `addFromPaths`
-- Ensures unique filenames for batched images (even without `%batch_num%`)
+- Parses the prompt (from a connected TEXT socket) into tags and attaches them to each item
+- Extracts model and LoRA names from workflow metadata and adds tags like `model:<name>`, `lora:<name>`
 
 Installation
 - Place this folder under your ComfyUI `custom_nodes` directory as `ComfyUI-Eagle-Send`.
@@ -14,13 +15,14 @@ Installation
 - Restart ComfyUI.
 
 Node: Eagle: Send Images
-- Input: `images` (IMAGE)
+- `images` (IMAGE)
+- `prompt` (STRING) forceInput only. Provide via a node connection; the widget is not used.
 - `filename_prefix` (STRING) default `ComfyUI/EagleSend`
   - Saves to `output/<prefix>_xxxxx_.png` (Save Image style). Use subfolders like `ComfyUI/Eagle` if desired.
 
 Notes
 - Images are saved to ComfyUI `output/` and those paths are sent to Eagle.
-- If the server rejects `paths`, the node retries per-file with `path`.
+- Payload strictly follows Eagle API JSON for `addFromPaths`: `{ "items": [{ "path": "...", "tags": ["..."] }] }`.
 - Eagle host is read from `EAGLE_API_HOST` environment variable if set; otherwise defaults to `http://127.0.0.1:41595`.
 
 Troubleshooting

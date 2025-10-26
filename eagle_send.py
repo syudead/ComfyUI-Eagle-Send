@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 import json
 import re
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Tuple
 
 import folder_paths
 
@@ -133,18 +133,6 @@ class EagleSend:
                 return [x for x in nodes if isinstance(x, dict)]
         return []
 
-    def _find_str_in_widgets(self, widgets_values: Any, exts: List[str]) -> str:
-        try:
-            if isinstance(widgets_values, list):
-                for v in widgets_values:
-                    if isinstance(v, str):
-                        lv = v.lower()
-                        if any(lv.endswith(e) for e in exts):
-                            return v
-        except Exception:
-            pass
-        return ""
-
     def _value_from_inputs(self, node: Dict[str, Any], key: str) -> Any:
         try:
             inputs = node.get("inputs", {}) or {}
@@ -153,21 +141,6 @@ class EagleSend:
         except Exception:
             pass
         return None
-
-    def _strings_from_structure(self, obj: Any) -> List[str]:
-        out: List[str] = []
-        try:
-            if isinstance(obj, str):
-                out.append(obj)
-            elif isinstance(obj, (list, tuple)):
-                for v in obj:
-                    out.extend(self._strings_from_structure(v))
-            elif isinstance(obj, dict):
-                for v in obj.values():
-                    out.extend(self._strings_from_structure(v))
-        except Exception:
-            pass
-        return out
 
     def _normalize_name_drop_ext(self, name: str) -> str:
         if not isinstance(name, str):
@@ -217,16 +190,15 @@ class EagleSend:
                         result["model_name"] = self._normalize_name_drop_ext(wv[0])
                         model_found = True
             elif t in self.LORA_NODE_TYPES:
-                inp = node.get("inputs", None)
+                inp = node.get("inputs", {}) or {}
                 if t == "Power Lora Loader (rgthree)":
-                    # Inputs may be dict of lora_* entries or entries may be present in widgets_values
                     handled = False
                     if isinstance(inp, dict):
                         for key, val in inp.items():
                             if isinstance(key, str) and key.startswith("lora_") and isinstance(val, dict):
                                 if val.get("on") is True and isinstance(val.get("lora"), str):
                                     nm = val.get("lora").strip()
-                                    if nm and ("/" not in nm and "\\" not in nm):
+                                    if nm:
                                         lora_names.append(self._normalize_name_drop_ext(nm))
                                         handled = True
                     if not handled:
@@ -235,14 +207,13 @@ class EagleSend:
                             for entry in wv:
                                 if isinstance(entry, dict) and entry.get("on") is True and isinstance(entry.get("lora"), str):
                                     nm = entry.get("lora").strip()
-                                    if nm and ("/" not in nm and "\\" not in nm):
+                                    if nm:
                                         lora_names.append(self._normalize_name_drop_ext(nm))
                 else:
-                    # LoraLoader / LoraLoaderModelOnly: read lora_name input only
                     v = inp.get("lora_name") if isinstance(inp, dict) else None
                     if isinstance(v, str):
                         nm = v.strip()
-                        if nm and ("/" not in nm and "\\" not in nm):
+                        if nm:
                             lora_names.append(self._normalize_name_drop_ext(nm))
 
         seen = set()
@@ -319,8 +290,7 @@ class EagleSend:
         url = base + "/api/item/addFromPaths"
         items: List[Dict[str, Any]] = []
         for p in paths:
-            name = os.path.splitext(os.path.basename(p))[0]
-            item: Dict[str, Any] = {"path": p, "name": name}
+            item: Dict[str, Any] = {"path": p}
             if tags:
                 item["tags"] = tags
             items.append(item)
