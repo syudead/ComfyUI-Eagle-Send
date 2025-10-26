@@ -28,6 +28,7 @@ class EagleSend:
             "required": {
                 "images": ("IMAGE",),
                 "filename_prefix": ("STRING", {"default": "ComfyUI/EagleSend"}),
+                "prompt": ("STRING", {"default": "", "multiline": True}),
             }
         }
 
@@ -117,12 +118,26 @@ class EagleSend:
                 return int(getattr(e, "code", 0) or 0), text
             return 0, str(e)
 
-    def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str]) -> Tuple[int, str]:
+    def _prompt_to_tags(self, prompt: str) -> List[str]:
+        if not isinstance(prompt, str) or not prompt.strip():
+            return []
+        import re
+        parts = re.split(r"(?:\r?\n|,|;|\bBREAK\b)", prompt, flags=re.IGNORECASE)
+        tags: List[str] = []
+        for p in parts:
+            t = p.strip()
+            if t:
+                tags.append(t)
+        return tags
+
+    def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str], tags: List[str]) -> Tuple[int, str]:
         base = host.strip().rstrip("/")
         path = "/" + endpoint_path.strip().lstrip("/")
         url = base + path
 
         payload: Dict[str, Any] = {"paths": paths}
+        if isinstance(tags, list) and tags:
+            payload["tags"] = tags
 
         headers = {"Content-Type": "application/json"}
         code, text = self._post_json(url, payload, headers)
@@ -144,6 +159,7 @@ class EagleSend:
         self,
         images,
         filename_prefix: str,
+        prompt: str,
     ):
         pil_images = self._tensor_to_pil_list(images)
         saved_paths: List[str] = []
@@ -154,7 +170,8 @@ class EagleSend:
         host = os.environ.get("EAGLE_API_HOST", "http://127.0.0.1:41595")
         endpoint_path = "/api/item/addFromPaths"
 
-        code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths)
+        tags = self._prompt_to_tags(prompt)
+        code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths, tags)
         resp_text = f"HTTP {code}: {resp_text}"
 
         # No cleanup: images saved to output directory like SaveImage node
