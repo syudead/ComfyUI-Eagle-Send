@@ -30,11 +30,6 @@ class EagleSend:
             "required": {
                 "images": ("IMAGE",),
                 "filename_prefix": ("STRING", {"default": "ComfyUI/EagleSend"}),
-                "folder_id": ("STRING", {"default": ""}),
-                "tags": ("STRING", {"default": ""}),
-                "name": ("STRING", {"default": ""}),
-                "annotation": ("STRING", {"default": "", "multiline": True}),
-                "dry_run": ("BOOLEAN", {"default": False}),
             }
         }
 
@@ -124,31 +119,12 @@ class EagleSend:
                 return int(getattr(e, "code", 0) or 0), text
             return 0, str(e)
 
-    def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str], meta: Dict[str, Any]) -> Tuple[int, str]:
+    def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str]) -> Tuple[int, str]:
         base = host.strip().rstrip("/")
         path = "/" + endpoint_path.strip().lstrip("/")
         url = base + path
 
         payload: Dict[str, Any] = {"paths": paths}
-
-        # Attach optional metadata if present
-        folder_id = (meta.get("folderId") or meta.get("folder_id") or "").strip()
-        if folder_id:
-            payload["folderId"] = folder_id
-
-        tags = meta.get("tags")
-        if isinstance(tags, list) and tags:
-            payload["tags"] = tags
-
-        name = (meta.get("name") or "").strip()
-        if name:
-            payload["name"] = name
-
-        annotation = meta.get("annotation")
-        if isinstance(annotation, str) and annotation:
-            payload["annotation"] = annotation
-
-        # rating/star not used
 
         headers = {"Content-Type": "application/json"}
         code, text = self._post_json(url, payload, headers)
@@ -170,44 +146,18 @@ class EagleSend:
         self,
         images,
         filename_prefix: str,
-        folder_id: str,
-        tags: str,
-        name: str,
-        annotation: str,
-        dry_run: bool,
     ):
         pil_images = self._tensor_to_pil_list(images)
         saved_paths: List[str] = []
         if pil_images:
             saved_paths = self._save_images_output(pil_images, filename_prefix)
 
-        tag_list: List[str] = []
-        if isinstance(tags, str) and tags.strip():
-            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
-
-        meta = {
-            "folderId": folder_id.strip(),
-            "tags": tag_list,
-            "name": name.strip(),
-            "annotation": annotation or "",
-        }
-
         # Hardcoded Eagle API config
         host = os.environ.get("EAGLE_API_HOST", "http://127.0.0.1:41595")
         endpoint_path = "/api/item/addFromPaths"
 
-        if dry_run:
-            msg = {
-                "host": host,
-                "endpoint_path": endpoint_path,
-                "paths": saved_paths,
-                "meta": meta,
-                "note": "dry_run=true; not sent to Eagle",
-            }
-            resp_text = json.dumps(msg, ensure_ascii=False)
-        else:
-            code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths, meta)
-            resp_text = f"HTTP {code}: {resp_text}"
+        code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths)
+        resp_text = f"HTTP {code}: {resp_text}"
 
         # No cleanup: images saved to output directory like SaveImage node
 
