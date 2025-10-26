@@ -1,8 +1,9 @@
 from __future__ import annotations
 import os
 import json
-from typing import List, Any, Dict
 import re
+from typing import List, Any, Dict
+
 import folder_paths
 
 try:
@@ -16,7 +17,6 @@ except Exception:  # pragma: no cover
     Image = None
 
 try:
-    # Prefer stdlib to avoid extra dependencies
     import urllib.request as _urlreq
 except Exception:  # pragma: no cover
     _urlreq = None
@@ -51,20 +51,16 @@ class EagleSend:
         pil_images: List[Any] = []
         if images_tensor is None:
             return pil_images
-
         if not isinstance(images_tensor, torch.Tensor):
             raise TypeError("images must be a torch.Tensor from ComfyUI")
 
         tensor = images_tensor.detach().cpu().clamp(0.0, 1.0)
-
         if tensor.ndim == 3:
             tensor = tensor.unsqueeze(0)
-
         if tensor.ndim != 4 or tensor.shape[-1] not in (1, 3, 4):
             raise ValueError(f"Unexpected IMAGE tensor shape: {tuple(tensor.shape)}")
 
         tensor = (tensor * 255.0).round().to(torch.uint8)
-
         for frame_index in range(tensor.shape[0]):
             image_tensor_slice = tensor[frame_index]
             if image_tensor_slice.shape[-1] == 1:
@@ -119,11 +115,16 @@ class EagleSend:
                 return int(getattr(exc, "code", 0) or 0), text
             return 0, str(exc)
 
-    def _normalize_prompt(self, prompt: str) -> str:\n        """Normalize separators to newlines and replace literal BREAK with newlines."""\n        if not isinstance(prompt, str):\n            return ""\n        normalized = prompt.replace("\r\n", "\n").replace("\r", "\n")\n        separators = [",", "，", "、", ";", "；", "|", "｜", "/", "／"]\n        for separator in separators:\n            normalized = normalized.replace(separator, "\n")\n        normalized = re.sub(r"(?i)\\bBREAK\\b", "\n", normalized)\n        return normalized\n\n    \n        normalized = prompt.replace("\r\n", "\n").replace("\r", "\n")
-        for separator in [",", "，", "、", ";", "；", "|", "｜", "/", "／"]:
+    def _normalize_prompt(self, prompt: str) -> str:
+        """Normalize separators to newlines and replace literal BREAK with newlines."""
+        if not isinstance(prompt, str):
+            return ""
+        normalized = prompt.replace("\r\n", "\n").replace("\r", "\n")
+        separators = [",", "，", "、", ";", "；", "|", "｜", "/", "／"]
+        for separator in separators:
             normalized = normalized.replace(separator, "\n")
-        text = re.sub(r"(?i)\bBREAK\b", "\n", text)
-        return token_strext
+        normalized = re.sub(r"(?i)\bBREAK\b", "\n", normalized)
+        return normalized
 
     def _clean_tag(self, token: str) -> str:
         """Trim, strip simple wrappers/weights, and collapse spaces."""
@@ -136,13 +137,25 @@ class EagleSend:
         if token_str and token_str[-1] in ")]}":
             token_str = token_str[:-1].strip()
         # Convert "tag:1.2" -> "tag"
-        match = re.match(r"^([^:(){}\\[\\]]+):\\d+(?:\\.\\d+)?$", token_str)
+        match = re.match(r"^([^:(){}\[\]]+):\d+(?:\.\d+)?$", token_str)
         if match:
             token_str = match.group(1).strip()
-        token_str = re.sub(r"\\s+", " ", token_str)
+        token_str = re.sub(r"\s+", " ", token_str)
         return token_str
 
-    def _prompt_to_tags(self, prompt: str) -> List[str]:\n        normalized = self._normalize_prompt(prompt)\n        tags: List[str] = []\n        seen_tags: set[str] = set()\n        for raw_token in normalized.split("\n"):\n            cleaned_tag = self._clean_tag(raw_token)\n            if cleaned_tag and cleaned_tag not in seen_tags:\n                tags.append(cleaned_tag)\n                seen_tags.add(cleaned_tag)\n            if len(tags) >= 128:\n                break\n        return tags\n\n    \n
+    def _prompt_to_tags(self, prompt: str) -> List[str]:
+        normalized = self._normalize_prompt(prompt)
+        tags: List[str] = []
+        seen_tags: set[str] = set()
+        for raw_token in normalized.split("\n"):
+            cleaned_tag = self._clean_tag(raw_token)
+            if cleaned_tag and cleaned_tag not in seen_tags:
+                tags.append(cleaned_tag)
+                seen_tags.add(cleaned_tag)
+            if len(tags) >= 128:
+                break
+        return tags
+
     def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str], tags: List[str]) -> Tuple[int, str]:
         base = host.strip().rstrip("/")
         path = "/" + endpoint_path.strip().lstrip("/")
@@ -188,8 +201,6 @@ class EagleSend:
         debug_info = {"tags_count": len(tags), "tags_preview": tags[:10]}
         resp_text = json.dumps({"debug": debug_info, "http": code, "body": resp_text}, ensure_ascii=False)
 
-        # No cleanup: images saved to output directory like SaveImage node
-
         return (images, resp_text)
 
 
@@ -200,6 +211,4 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "EagleSend": "Eagle: Send Images",
 }
-
-
 
