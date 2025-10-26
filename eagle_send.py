@@ -78,7 +78,45 @@ class EagleSend:
             pil_images.append(pil_image)
         return pil_images
 
-    def _save_images_output(self, pil_images: List[Any], filename_prefix: str, prompt: str | None = None, extra_pnginfo=None) -> List[str]:
+    def _normalize_prompt(self, text: str) -> str:
+        """Normalize common separators to newlines (ASCII + fullwidth + BREAK)."""
+        if not isinstance(text, str):
+            return ""
+        t = text.replace("\r\n", "\n").replace("\r", "\n")
+        pattern = r"(?:\r?\n|,|;|\||/|\uFF0C|\u3001|\uFF1B|\uFF5C|\uFF0F|(?i:BREAK))"
+        t = re.sub(pattern, "\n", t)
+        t = re.sub(r"\n+", "\n", t)
+        return t.strip("\n")
+
+    def _clean_tag(self, token: str) -> str:
+        """Trim, strip simple wrappers/weights, and collapse spaces."""
+        token_str = (token or "").strip()
+        if not token_str:
+            return ""
+        if token_str and token_str[0] in "([{":
+            token_str = token_str[1:].strip()
+        if token_str and token_str[-1] in ")]}":
+            token_str = token_str[:-1].strip()
+        match = re.match(r"^([^:(){}\[\]]+):\d+(?:\.\d+)?$", token_str)
+        if match:
+            token_str = match.group(1).strip()
+        token_str = re.sub(r"\s+", " ", token_str)
+        return token_str
+
+    def _prompt_to_tags(self, text: str) -> List[str]:
+        normalized = self._normalize_prompt(text)
+        tags: List[str] = []
+        seen: set[str] = set()
+        for raw in normalized.split("\n"):
+            cleaned = self._clean_tag(raw)
+            if cleaned and cleaned not in seen:
+                tags.append(cleaned)
+                seen.add(cleaned)
+            if len(tags) >= 128:
+                break
+        return tags
+
+    def _save_images_output(self, pil_images: List[Any], filename_prefix: str, prompt: str | None, extra_pnginfo: Dict[str, Any] | None) -> List[str]:
         paths: List[str] = []
         if not pil_images:
             return paths
@@ -87,21 +125,23 @@ class EagleSend:
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
             filename_prefix, output_dir, width, height
         )
-        has_batch_token = "%batch_num%" in filename
-        # Prepare PNG metadata similar to SaveImage node (embed workflow + human prompt)
+        # Prepare PNG metadata: embed workflow and human prompt
         pnginfo = None
         try:
             from PIL.PngImagePlugin import PngInfo  # type: ignore
             pnginfo = PngInfo()
-            # Embed human-readable prompt for external tools (e.g., Civitai)
             if isinstance(prompt, str) and prompt.strip():
                 pnginfo.add_text("parameters", prompt)
-            if extra_pnginfo is not None:
-                for key in extra_pnginfo:
-                    pnginfo.add_text(key, json.dumps(extra_pnginfo[key]))
+            if isinstance(extra_pnginfo, dict):
+                for key, val in extra_pnginfo.items():
+                    try:
+                        pnginfo.add_text(key, json.dumps(val))
+                    except Exception:
+                        pass
         except Exception:
             pnginfo = None
 
+        has_batch_token = "%batch_num%" in filename
         for batch_number, pil_image in enumerate(pil_images):
             if has_batch_token:
                 filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
@@ -135,51 +175,9 @@ class EagleSend:
                 return int(getattr(exc, "code", 0) or 0), text
             return 0, str(exc)
 
-    def _normalize_prompt(self, prompt: str) -> str:
-        """Normalize separators to newlines and replace literal BREAK with newlines."""
-        if not isinstance(prompt, str):
-            return ""
-        normalized = prompt.replace("\r\n", "\n").replace("\r", "\n")
-        separators = [",", "，", "、", ";", "；", "|", "｜", "/", "／"]\n        for separator in separators:", "；", "|", "｜", "/", "／"]
-        for separator in separators:
-            normalized = normalized.replace(separator, "\\n")\n        normalized = re.sub(r"(?i)\bBREAK\b", "\n", normalized)
-        return normalized
-
-    def _clean_tag(self, token: str) -> str:
-        """Trim, strip simple wrappers/weights, and collapse spaces."""
-        token_str = (token or "").strip()
-        if not token_str:
-            return ""
-        # Strip one layer of wrapping brackets/parens
-        if token_str and token_str[0] in "([{":
-            token_str = token_str[1:].strip()
-        if token_str and token_str[-1] in ")]}":
-            token_str = token_str[:-1].strip()
-        # Convert "tag:1.2" -> "tag"
-        match = re.match(r"^([^:(){}\[\]]+):\d+(?:\.\d+)?$", token_str)
-        if match:
-            token_str = match.group(1).strip()
-        token_str = re.sub(r"\s+", " ", token_str)
-        return token_str
-
-    def _prompt_to_tags(self, text: str) -> List[str]:
-        normalized = self._normalize_prompt(text)
-        tags: List[str] = []
-        seen_tags: set[str] = set()
-        for raw_token in normalized.split("\n"):
-            cleaned_tag = self._clean_tag(raw_token)
-            if cleaned_tag and cleaned_tag not in seen_tags:
-                tags.append(cleaned_tag)
-                seen_tags.add(cleaned_tag)
-            if len(tags) >= 128:
-                break
-        return tags
-
-    def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str], tags: List[str]) -> Tuple[int, str]:
-        """Use addFromPaths with items to apply tags at creation."""
+    def _send_to_eagle(self, host: str, paths: List[str], tags: List[str]) -> Tuple[int, str]:
         base = host.strip().rstrip("/")
         url = base + "/api/item/addFromPaths"
-
         items: List[Dict[str, Any]] = []
         for p in paths:
             name = os.path.splitext(os.path.basename(p))[0]
@@ -187,9 +185,7 @@ class EagleSend:
             if tags:
                 item["tags"] = tags
             items.append(item)
-
         payload: Dict[str, Any] = {"items": items}
-
         headers = {"Content-Type": "application/json"}
         code, text = self._post_json(url, payload, headers)
         return code, text
@@ -204,22 +200,13 @@ class EagleSend:
         pil_images = self._tensor_to_pil_list(images)
         saved_paths: List[str] = []
         if pil_images:
-            saved_paths = self._save_images_output(pil_images, filename_prefix, prompt=prompt, extra_pnginfo=extra_pnginfo)
+            saved_paths = self._save_images_output(pil_images, filename_prefix, prompt, extra_pnginfo)
 
-        # Hardcoded Eagle API config
         host = os.environ.get("EAGLE_API_HOST", "http://127.0.0.1:41595")
-        endpoint_path = "/api/item/addFromPaths"
-
         tags = self._prompt_to_tags(prompt)
-        code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths, tags)
-        debug_info = {
-            "tags_count": len(tags),
-            "tags_preview": tags[:10],
-            "paths_count": len(saved_paths),
-        }
-        resp_text = json.dumps({"debug": debug_info, "http": code, "body": resp_text}, ensure_ascii=False)
-
-        return (images, resp_text)
+        code, resp_text = self._send_to_eagle(host, saved_paths, tags)
+        resp = {"http": code, "paths": len(saved_paths), "tags": len(tags), "body": resp_text}
+        return (images, json.dumps(resp, ensure_ascii=False))
 
 
 NODE_CLASS_MAPPINGS = {
@@ -229,6 +216,4 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "EagleSend": "Eagle: Send Images",
 }
-
-
 
