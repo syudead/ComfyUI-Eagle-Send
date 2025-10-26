@@ -121,9 +121,7 @@ class EagleSend:
     LORA_NODE_TYPES = {
         "LoraLoader",
         "LoraLoaderModelOnly",
-        "RGT_PowerLoraLoader",
-        "PowerLoraLoader",
-        "PowerLoRALoader",
+        "Power Lora Loader (rgthree)",
     }
 
     def _as_nodes_list(self, workflow_obj: Any) -> List[Dict[str, Any]]:
@@ -175,6 +173,8 @@ class EagleSend:
         if not isinstance(name, str):
             return ""
         base = name.strip()
+        # use last path component only
+        base = base.replace("\\", "/").split("/")[-1]
         for ext in (".safetensors", ".ckpt", ".pth", ".pt"):
             if base.lower().endswith(ext):
                 base = base[: -len(ext)]
@@ -200,38 +200,33 @@ class EagleSend:
         lora_names: List[str] = []
 
         for node in nodes:
+            # Respect node-level disabled/bypass flags
+            if bool(node.get("disabled")) or bool(node.get("bypass")):
+                continue
             t = node.get("type")
             if t in self.MODEL_NODE_TYPES and not model_found:
                 v = self._value_from_inputs(node, "ckpt_name")
                 if isinstance(v, str) and v.strip():
                     result["model_name"] = self._normalize_name_drop_ext(v)
                     model_found = True
+            elif t in self.LORA_NODE_TYPES:
+                inp = node.get("inputs", {}) or {}
+                if t == "Power Lora Loader (rgthree)":
+                    # inputs contain keys like 'lora_1', each is a dict with {on, lora, strength...}
+                    for key, val in inp.items():
+                        if isinstance(key, str) and key.startswith("lora_") and isinstance(val, dict):
+                            if val.get("on") is True and isinstance(val.get("lora"), str):
+                                nm = val.get("lora").strip()
+                                # accept only logical names (not paths)
+                                if nm and ("/" not in nm and "\\" not in nm):
+                                    lora_names.append(nm)
                 else:
-                    name = self._find_str_in_widgets(node.get("widgets_values"), exts)
-                    if name:
-                        result["model_name"] = self._normalize_name_drop_ext(name)
-                        model_found = True
-            else:
-                is_lora_node = t in self.LORA_NODE_TYPES or (
-                    isinstance(t, str) and ("lora" in t.lower() and "loader" in t.lower())
-                )
-                if is_lora_node:
-                    v = self._value_from_inputs(node, "lora_name")
-                    names: List[str] = []
-                    if isinstance(v, str) and v.strip():
-                        names = [v]
-                    else:
-                        candidates = []
-                        candidates.extend(self._strings_from_structure(node.get("inputs", {})))
-                        candidates.extend(self._strings_from_structure(node.get("widgets_values")))
-                        for s in candidates:
-                            ls = s.lower()
-                            if any(ls.endswith(e) for e in exts):
-                                names.append(s)
-                    for nm in names:
-                        nm2 = self._normalize_name_drop_ext(nm)
-                        if nm2:
-                            lora_names.append(nm2)
+                    # LoraLoader / LoraLoaderModelOnly: read lora_name input only
+                    v = inp.get("lora_name")
+                    if isinstance(v, str):
+                        nm = v.strip()
+                        if nm and ("/" not in nm and "\\" not in nm):
+                            lora_names.append(nm)
 
         seen = set()
         uniq_loras = []
