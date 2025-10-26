@@ -1,9 +1,7 @@
 from __future__ import annotations
 import os
 import json
-import tempfile
 from typing import List, Tuple, Any, Dict
-import time
 import folder_paths
 
 try:
@@ -31,16 +29,12 @@ class EagleSend:
         return {
             "required": {
                 "images": ("IMAGE",),
-                "host": ("STRING", {"default": os.environ.get("EAGLE_API_HOST", "http://127.0.0.1:41595")}),
                 "filename_prefix": ("STRING", {"default": "ComfyUI/EagleSend"}),
                 "folder_id": ("STRING", {"default": ""}),
                 "tags": ("STRING", {"default": ""}),
                 "name": ("STRING", {"default": ""}),
                 "annotation": ("STRING", {"default": "", "multiline": True}),
                 "rating": ("INT", {"default": 0, "min": 0, "max": 5, "step": 1}),
-                "endpoint_path": ("STRING", {"default": "/api/item/addFromPaths"}),
-                "api_token": ("STRING", {"default": ""}),
-                "keep_temp": ("BOOLEAN", {"default": False}),
                 "dry_run": ("BOOLEAN", {"default": False}),
             }
         }
@@ -125,15 +119,7 @@ class EagleSend:
                 return int(getattr(e, "code", 0) or 0), text
             return 0, str(e)
 
-    def _build_headers(self, api_token: str) -> Dict[str, str]:
-        headers = {"Content-Type": "application/json"}
-        token = api_token.strip()
-        if token:
-            # Common Eagle pattern uses Authorization: Bearer <token>
-            headers["Authorization"] = f"Bearer {token}"
-        return headers
-
-    def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str], meta: Dict[str, Any], api_token: str) -> Tuple[int, str]:
+    def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str], meta: Dict[str, Any]) -> Tuple[int, str]:
         base = host.strip().rstrip("/")
         path = "/" + endpoint_path.strip().lstrip("/")
         url = base + path
@@ -161,7 +147,7 @@ class EagleSend:
         if isinstance(rating, int) and rating > 0:
             payload["star"] = rating
 
-        headers = self._build_headers(api_token)
+        headers = {"Content-Type": "application/json"}
         code, text = self._post_json(url, payload, headers)
 
         # Fallback: try singular key if server rejects plural
@@ -180,16 +166,12 @@ class EagleSend:
     def send(
         self,
         images,
-        host: str,
         filename_prefix: str,
         folder_id: str,
         tags: str,
         name: str,
         annotation: str,
         rating: int,
-        endpoint_path: str,
-        api_token: str,
-        keep_temp: bool,
         dry_run: bool,
     ):
         pil_images = self._tensor_to_pil_list(images)
@@ -209,6 +191,10 @@ class EagleSend:
             "rating": int(rating) if isinstance(rating, int) else 0,
         }
 
+        # Hardcoded Eagle API config
+        host = os.environ.get("EAGLE_API_HOST", "http://127.0.0.1:41595")
+        endpoint_path = "/api/item/addFromPaths"
+
         if dry_run:
             msg = {
                 "host": host,
@@ -219,7 +205,7 @@ class EagleSend:
             }
             resp_text = json.dumps(msg, ensure_ascii=False)
         else:
-            code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths, meta, api_token)
+            code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths, meta)
             resp_text = f"HTTP {code}: {resp_text}"
 
         # No cleanup: images saved to output directory like SaveImage node
