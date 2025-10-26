@@ -164,6 +164,8 @@ class EagleSend:
         payload: Dict[str, Any] = {"paths": paths}
         if isinstance(tags, list) and tags:
             payload["tags"] = tags
+            # Add a comma-separated variant for broader compatibility
+            payload["tagsText"] = ", ".join(tags)
 
         headers = {"Content-Type": "application/json"}
         code, text = self._post_json(url, payload, headers)
@@ -198,7 +200,11 @@ class EagleSend:
 
         tags = self._prompt_to_tags(prompt)
         code, resp_text = self._send_to_eagle(host, endpoint_path, saved_paths, tags)
-        debug_info = {"tags_count": len(tags), "tags_preview": tags[:10]}
+        debug_info = {
+            "tags_count": len(tags),
+            "tags_preview": tags[:10],
+            "paths_count": len(saved_paths),
+        }
         resp_text = json.dumps({"debug": debug_info, "http": code, "body": resp_text}, ensure_ascii=False)
 
         return (images, resp_text)
@@ -211,4 +217,3 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "EagleSend": "Eagle: Send Images",
 }
-
