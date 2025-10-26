@@ -299,12 +299,27 @@ class EagleSend:
 
         host = os.environ.get("EAGLE_API_HOST", "http://127.0.0.1:41595")
         tags = self._prompt_to_tags(prompt)
+        # add model/lora from workflow (EXTRA_PNGINFO)
+        resources = self._parse_workflow_resources(extra_pnginfo)
+        model_name = resources.get("model_name") or ""
+        if model_name:
+            tag_model = f"model:{model_name}"
+            if tag_model not in tags:
+                tags.append(tag_model)
+        loras = resources.get("loras") or []
+        for ln in loras:
+            tag_lora = f"lora:{ln}"
+            if tag_lora not in tags:
+                tags.append(tag_lora)
+
         code, resp_text = self._send_to_eagle(host, saved_paths, tags)
         resp = {
             "http": code,
             "paths": len(saved_paths),
             "tags_count": len(tags),
             "tags": tags,
+            "model_name": model_name,
+            "loras": loras,
             "body": resp_text,
         }
         return (images, json.dumps(resp, ensure_ascii=False))
