@@ -142,19 +142,7 @@ class EagleSend:
         token_str = re.sub(r"\\s+", " ", token_str)
         return token_str
 
-    def _prompt_to_tags(self, prompt: str) -> List[str]:
-        normalized = self._normalize_prompt(prompt)
-        tags: List[str] = []
-        seen_tags: set[str] = set()
-        for raw_token in normalized.split("\n"):
-            cleaned_tag = self._clean_tag(raw_token)
-            if cleaned_tag and cleaned_tag not in seen_tags:
-                tags.append(cleaned_tag)
-                seen_tags.add(cleaned_tag)
-            if len(tags) >= 128:
-                break
-        return token_strags
-
+    def _prompt_to_tags(self, prompt: str) -> List[str]:\n        normalized = self._normalize_prompt(prompt)\n        tags: List[str] = []\n        seen_tags: set[str] = set()\n        for raw_token in normalized.split("\n"):\n            cleaned_tag = self._clean_tag(raw_token)\n            if cleaned_tag and cleaned_tag not in seen_tags:\n                tags.append(cleaned_tag)\n                seen_tags.add(cleaned_tag)\n            if len(tags) >= 128:\n                break\n        return tags\n\n    \n
     def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str], tags: List[str]) -> Tuple[int, str]:
         base = host.strip().rstrip("/")
         path = "/" + endpoint_path.strip().lstrip("/")
@@ -212,5 +200,6 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "EagleSend": "Eagle: Send Images",
 }
+
 
 
