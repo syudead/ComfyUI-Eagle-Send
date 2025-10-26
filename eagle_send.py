@@ -30,7 +30,6 @@ class EagleSend:
                 "images": ("IMAGE",),
                 "filename_prefix": ("STRING", {"default": "ComfyUI/EagleSend"}),
                 "prompt": ("STRING", {"default": "", "multiline": True, "forceInput": True}),
-                "model": ("MODEL",),
             },
             "hidden": {
                 "extra_pnginfo": "EXTRA_PNGINFO",
@@ -117,28 +116,6 @@ class EagleSend:
                 break
         return tags
 
-    def _normalize_model_name(self, name: str) -> str:
-        if not isinstance(name, str):
-            return ""
-        base = name.strip()
-        if not base:
-            return ""
-        for ext in (".safetensors", ".ckpt", ".pth", ".pt"):
-            if base.lower().endswith(ext):
-                base = base[: -len(ext)]
-                break
-        return base.strip()
-
-    def _extract_model_name(self, model_obj: Any) -> str:
-        try:
-            for attr in ("ckpt_name", "ckpt", "name", "model_name", "sd_model_name"):
-                if hasattr(model_obj, attr):
-                    val = getattr(model_obj, attr)
-                    if isinstance(val, str) and val.strip():
-                        return self._normalize_model_name(val)
-        except Exception:
-            pass
-        return ""
 
     def _save_images_output(self, pil_images: List[Any], filename_prefix: str, prompt: str | None, extra_pnginfo: Dict[str, Any] | None) -> List[str]:
         paths: List[str] = []
@@ -219,7 +196,6 @@ class EagleSend:
         images,
         filename_prefix: str,
         prompt: str,
-        model,
         extra_pnginfo=None,
     ):
         pil_images = self._tensor_to_pil_list(images)
@@ -229,18 +205,12 @@ class EagleSend:
 
         host = os.environ.get("EAGLE_API_HOST", "http://127.0.0.1:41595")
         tags = self._prompt_to_tags(prompt)
-        model_name = self._extract_model_name(model)
-        if model_name:
-            mt = f"model:{model_name}"
-            if mt not in tags:
-                tags.append(mt)
         code, resp_text = self._send_to_eagle(host, saved_paths, tags)
         resp = {
             "http": code,
             "paths": len(saved_paths),
             "tags_count": len(tags),
             "tags": tags,
-            "model_name": model_name,
             "body": resp_text,
         }
         return (images, json.dumps(resp, ensure_ascii=False))
