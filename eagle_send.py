@@ -157,30 +157,22 @@ class EagleSend:
         return tags
 
     def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str], tags: List[str]) -> Tuple[int, str]:
+        """Use addFromPaths with items to apply tags at creation."""
         base = host.strip().rstrip("/")
-        path = "/" + endpoint_path.strip().lstrip("/")
-        url = base + path
+        url = base + "/api/item/addFromPaths"
 
-        payload: Dict[str, Any] = {"paths": paths}
-        if isinstance(tags, list) and tags:
-            payload["tags"] = tags
-            # Add a comma-separated variant for broader compatibility
-            payload["tagsText"] = ", ".join(tags)
+        items: List[Dict[str, Any]] = []
+        for p in paths:
+            name = os.path.splitext(os.path.basename(p))[0]
+            item: Dict[str, Any] = {"path": p, "name": name}
+            if tags:
+                item["tags"] = tags
+            items.append(item)
+
+        payload: Dict[str, Any] = {"items": items}
 
         headers = {"Content-Type": "application/json"}
         code, text = self._post_json(url, payload, headers)
-
-        # Fallback: try singular key if server rejects plural
-        if code == 404 or (code >= 400 and "paths" in text.lower()):
-            results = []
-            for p in paths:
-                one_payload = dict(payload)
-                one_payload.pop("paths", None)
-                one_payload["path"] = p
-                c, t = self._post_json(url, one_payload, headers)
-                results.append({"path": p, "status": c, "response": t})
-            return 207, json.dumps(results, ensure_ascii=False)
-
         return code, text
 
     def send(
