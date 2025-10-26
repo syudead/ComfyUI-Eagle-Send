@@ -29,10 +29,9 @@ class EagleSend:
             "required": {
                 "images": ("IMAGE",),
                 "filename_prefix": ("STRING", {"default": "ComfyUI/EagleSend"}),
-                "tags_text": ("STRING", {"default": "", "multiline": True, "forceInput": True}),
+                "prompt": ("STRING", {"default": "", "multiline": True, "forceInput": True}),
             },
             "hidden": {
-                "prompt": "PROMPT",
                 "extra_pnginfo": "EXTRA_PNGINFO",
             },
         }
@@ -140,10 +139,9 @@ class EagleSend:
         if not isinstance(prompt, str):
             return ""
         normalized = prompt.replace("\r\n", "\n").replace("\r", "\n")
-        separators = [",", "，", "、", ";", "；", "|", "｜", "/", "／"]
+        separators = [",", "，", "、", ";", "；", "|", "｜", "/", "／"]\n        for separator in separators:", "；", "|", "｜", "/", "／"]
         for separator in separators:
-            normalized = normalized.replace(separator, "\n")
-        normalized = re.sub(r"(?i)\bBREAK\b", "\n", normalized)
+            normalized = normalized.replace(separator, "\\n")\n        normalized = re.sub(r"(?i)\bBREAK\b", "\n", normalized)
         return normalized
 
     def _clean_tag(self, token: str) -> str:
@@ -231,4 +229,5 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "EagleSend": "Eagle: Send Images",
 }
+
 
