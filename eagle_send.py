@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os
 import json
-from typing import List, Tuple, Any, Dict
+from typing import List, Any, Dict
 import folder_paths
 
 try:
@@ -17,10 +17,8 @@ except Exception:  # pragma: no cover
 try:
     # Prefer stdlib to avoid extra dependencies
     import urllib.request as _urlreq
-    import urllib.error as _urlerr
 except Exception:  # pragma: no cover
     _urlreq = None
-    _urlerr = None
 
 
 class EagleSend:
