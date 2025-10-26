@@ -28,7 +28,7 @@ class EagleSend:
             "required": {
                 "images": ("IMAGE",),
                 "filename_prefix": ("STRING", {"default": "ComfyUI/EagleSend"}),
-                "prompt": ("STRING", {"default": "", "multiline": True}),
+                "prompt": ("STRING", {"default": "", "multiline": True, "forceInput": True}),
             }
         }
 
@@ -122,12 +122,29 @@ class EagleSend:
         if not isinstance(prompt, str) or not prompt.strip():
             return []
         import re
-        parts = re.split(r"(?:\r?\n|,|;|\bBREAK\b)", prompt, flags=re.IGNORECASE)
+        # Split on common separators used in prompts: newline, comma, semicolon, pipe, slash, and literal BREAK
+        parts = re.split(r"(?:\r?\n|,|，|、|;|；|\||｜|/|／|\bBREAK\b)", prompt, flags=re.IGNORECASE)
         tags: List[str] = []
+        seen = set()
         for p in parts:
             t = p.strip()
-            if t:
-                tags.append(t)
+            if not t:
+                continue
+            # Remove simple weight/paren wrappers e.g. (tag:1.2) -> tag, (tag) -> tag
+            t = re.sub(r"^[\(\[{]+|[\)\]\}]+$", "", t)
+            m = re.match(r"^([^:()\[\]{}]+):[0-9.]+$", t)
+            if m:
+                t = m.group(1).strip()
+            # collapse whitespace
+            t = re.sub(r"\s+", " ", t)
+            if not t:
+                continue
+            if t in seen:
+                continue
+            seen.add(t)
+            tags.append(t)
+            if len(tags) >= 128:
+                break
         return tags
 
     def _send_to_eagle(self, host: str, endpoint_path: str, paths: List[str], tags: List[str]) -> Tuple[int, str]:
