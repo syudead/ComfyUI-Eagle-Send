@@ -93,9 +93,15 @@ class EagleSend:
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
             filename_prefix, output_dir, w, h
         )
+        has_batch_token = "%batch_num%" in filename
         for batch_number, im in enumerate(pil_images):
-            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
-            file = f"{filename_with_batch_num}_{counter:05}_.png"
+            if has_batch_token:
+                filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+                cur_counter = counter
+            else:
+                filename_with_batch_num = filename
+                cur_counter = counter + batch_number
+            file = f"{filename_with_batch_num}_{cur_counter:05}_.png"
             save_path = os.path.join(full_output_folder, file)
             im.save(save_path, format="PNG")
             paths.append(save_path)
