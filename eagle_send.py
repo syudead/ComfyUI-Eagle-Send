@@ -34,7 +34,6 @@ class EagleSend:
                 "tags": ("STRING", {"default": ""}),
                 "name": ("STRING", {"default": ""}),
                 "annotation": ("STRING", {"default": "", "multiline": True}),
-                "rating": ("INT", {"default": 0, "min": 0, "max": 5, "step": 1}),
                 "dry_run": ("BOOLEAN", {"default": False}),
             }
         }
@@ -143,9 +142,7 @@ class EagleSend:
         if isinstance(annotation, str) and annotation:
             payload["annotation"] = annotation
 
-        rating = meta.get("rating")
-        if isinstance(rating, int) and rating > 0:
-            payload["star"] = rating
+        # rating/star not used
 
         headers = {"Content-Type": "application/json"}
         code, text = self._post_json(url, payload, headers)
@@ -171,7 +168,6 @@ class EagleSend:
         tags: str,
         name: str,
         annotation: str,
-        rating: int,
         dry_run: bool,
     ):
         pil_images = self._tensor_to_pil_list(images)
@@ -188,7 +184,6 @@ class EagleSend:
             "tags": tag_list,
             "name": name.strip(),
             "annotation": annotation or "",
-            "rating": int(rating) if isinstance(rating, int) else 0,
         }
 
         # Hardcoded Eagle API config
