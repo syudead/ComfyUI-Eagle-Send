@@ -118,7 +118,13 @@ class EagleSend:
 
     # --- Workflow parsing (fixed node definitions) ---
     MODEL_NODE_TYPES = {"CheckpointLoaderSimple", "CheckpointLoader"}
-    LORA_NODE_TYPES = {"LoraLoader", "LoraLoaderModelOnly"}
+    LORA_NODE_TYPES = {
+        "LoraLoader",
+        "LoraLoaderModelOnly",
+        "RGT_PowerLoraLoader",
+        "PowerLoraLoader",
+        "PowerLoRALoader",
+    }
 
     def _as_nodes_list(self, workflow_obj: Any) -> List[Dict[str, Any]]:
         if isinstance(workflow_obj, list):
@@ -149,6 +155,21 @@ class EagleSend:
         except Exception:
             pass
         return None
+
+    def _strings_from_structure(self, obj: Any) -> List[str]:
+        out: List[str] = []
+        try:
+            if isinstance(obj, str):
+                out.append(obj)
+            elif isinstance(obj, (list, tuple)):
+                for v in obj:
+                    out.extend(self._strings_from_structure(v))
+            elif isinstance(obj, dict):
+                for v in obj.values():
+                    out.extend(self._strings_from_structure(v))
+        except Exception:
+            pass
+        return out
 
     def _normalize_name_drop_ext(self, name: str) -> str:
         if not isinstance(name, str):
@@ -190,16 +211,27 @@ class EagleSend:
                     if name:
                         result["model_name"] = self._normalize_name_drop_ext(name)
                         model_found = True
-            elif t in self.LORA_NODE_TYPES:
-                v = self._value_from_inputs(node, "lora_name")
-                name = ""
-                if isinstance(v, str) and v.strip():
-                    name = v
-                else:
-                    name = self._find_str_in_widgets(node.get("widgets_values"), exts)
-                name = self._normalize_name_drop_ext(name)
-                if name:
-                    lora_names.append(name)
+            else:
+                is_lora_node = t in self.LORA_NODE_TYPES or (
+                    isinstance(t, str) and ("lora" in t.lower() and "loader" in t.lower())
+                )
+                if is_lora_node:
+                    v = self._value_from_inputs(node, "lora_name")
+                    names: List[str] = []
+                    if isinstance(v, str) and v.strip():
+                        names = [v]
+                    else:
+                        candidates = []
+                        candidates.extend(self._strings_from_structure(node.get("inputs", {})))
+                        candidates.extend(self._strings_from_structure(node.get("widgets_values")))
+                        for s in candidates:
+                            ls = s.lower()
+                            if any(ls.endswith(e) for e in exts):
+                                names.append(s)
+                    for nm in names:
+                        nm2 = self._normalize_name_drop_ext(nm)
+                        if nm2:
+                            lora_names.append(nm2)
 
         seen = set()
         uniq_loras = []
