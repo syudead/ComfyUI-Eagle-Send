@@ -235,7 +235,14 @@ class EagleSend:
             if mt not in tags:
                 tags.append(mt)
         code, resp_text = self._send_to_eagle(host, saved_paths, tags)
-        resp = {"http": code, "paths": len(saved_paths), "tags": len(tags), "body": resp_text}
+        resp = {
+            "http": code,
+            "paths": len(saved_paths),
+            "tags_count": len(tags),
+            "tags": tags,
+            "model_name": model_name,
+            "body": resp_text,
+        }
         return (images, json.dumps(resp, ensure_ascii=False))
 
 
