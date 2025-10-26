@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python tooling
+.mypy_cache/
+.pytest_cache/
+
+# ComfyUI runtime artifacts (defensive; usually outside this folder)
+*.log
+*.tmp
+tmp/
+
