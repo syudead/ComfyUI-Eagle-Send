@@ -1,6 +1,6 @@
 from __future__ import annotations
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 try:
     import urllib.request as _urlreq  # type: ignore
@@ -28,7 +28,7 @@ def _post_json(url: str, payload: Dict[str, Any], headers: Dict[str, str]) -> Tu
         return 0, str(exc)
 
 
-def send_to_eagle(host: str, paths: List[str], tags: List[str]) -> Tuple[int, str]:
+def send_to_eagle(host: str, paths: List[str], tags: List[str], annotation: Optional[str] = None) -> Tuple[int, str]:
     base = host.strip().rstrip("/")
     url = base + "/api/item/addFromPaths"
     items: List[Dict[str, Any]] = []
@@ -36,8 +36,10 @@ def send_to_eagle(host: str, paths: List[str], tags: List[str]) -> Tuple[int, st
         item: Dict[str, Any] = {"path": p}
         if tags:
             item["tags"] = tags
+        if annotation:
+            # Eagle memo field (annotation text)
+            item["annotation"] = annotation
         items.append(item)
     payload: Dict[str, Any] = {"items": items}
     headers = {"Content-Type": "application/json"}
     return _post_json(url, payload, headers)
-

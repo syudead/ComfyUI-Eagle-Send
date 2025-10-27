@@ -76,7 +76,7 @@ class EagleSend:
             except Exception:
                 ov = {}
 
-            a1111_params, model_name, loras = build_a1111_with_hashes(
+            a1111_params, model_name, loras, lora_weights = build_a1111_with_hashes(
                 positive=prompt or "",
                 negative=negative or "",
                 width=width,
@@ -105,7 +105,25 @@ class EagleSend:
             if tag_lora not in tags:
                 tags.append(tag_lora)
 
-        code, resp_text = send_to_eagle(host, saved_paths, tags)
+        # Build Eagle memo (annotation) for Eagle
+        try:
+            from ..metadata.generate import build_eagle_annotation
+            annotation_text = build_eagle_annotation(
+                positive=prompt or "",
+                negative=negative or "",
+                width=width,
+                height=height,
+                model_name=model_name,
+                loras=loras,
+                lora_weights=lora_weights,
+                overrides=ov or None,
+                memo_text=None,
+            )
+        except Exception:
+            annotation_text = a1111_params
+
+        code, resp_text = send_to_eagle(host, saved_paths, tags, annotation=annotation_text)
+        ok = 200 <= int(code or 0) < 300
         resp = {
             "http": code,
             "paths": len(saved_paths),
@@ -113,6 +131,10 @@ class EagleSend:
             "tags": tags,
             "model_name": model_name,
             "loras": loras,
+            "host": host,
+            "parameters": a1111_params,
+            "annotation": annotation_text,
+            "success": ok,
             "body": resp_text,
         }
         return (images, json.dumps(resp, ensure_ascii=False))

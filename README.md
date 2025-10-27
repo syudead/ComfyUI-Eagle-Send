@@ -8,6 +8,7 @@ Features
 - Sends one or more saved image paths to Eagle via `addFromPaths`
 - Parses the prompt (from a connected TEXT socket) into tags and attaches them to each item
 - Extracts model and LoRA names from workflow metadata and adds tags like `model:<name>`, `lora:<name>`
+ - Adds an annotation memo to Eagle items using the A1111-style parameters string
 
 Installation
 - Place this folder under your ComfyUI `custom_nodes` directory as `ComfyUI-Eagle-Send`.
@@ -23,6 +24,7 @@ Node: Eagle: Send Images
 Notes
 - Images are saved to ComfyUI `output/` and those paths are sent to Eagle.
 - Payload strictly follows Eagle API JSON for `addFromPaths`: `{ "items": [{ "path": "...", "tags": ["..."] }] }`.
+ - When available, an `annotation` field is also included per item, containing the A1111 parameters string (memo), similar to D2 Send Eagle.
 - Eagle host is read from `EAGLE_API_HOST` environment variable if set; otherwise defaults to `http://127.0.0.1:41595`.
 
 Project layout (refactor)

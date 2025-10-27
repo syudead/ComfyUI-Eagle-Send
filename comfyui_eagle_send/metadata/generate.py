@@ -12,6 +12,13 @@ from ..hash.compute import (
 from ..image.a1111 import build_parameters
 
 
+def _fmt_weight(v: float) -> str:
+    try:
+        return ("%g" % float(v))
+    except Exception:
+        return "1"
+
+
 def build_a1111_with_hashes(
     positive: str,
     negative: str | None,
@@ -19,7 +26,7 @@ def build_a1111_with_hashes(
     height: int,
     extra_pnginfo: Any,
     overrides: Dict[str, Any] | None = None,
-) -> Tuple[str, str, List[str]]:
+) -> Tuple[str, str, List[str], Dict[str, float]]:
     """Construct A1111 parameters string with model/LoRA short hashes.
 
     Returns (a1111_params, model_name, loras)
@@ -50,13 +57,6 @@ def build_a1111_with_hashes(
         except Exception:
             pass
 
-    def _fmt_weight(v: float) -> str:
-        try:
-            # Trim trailing zeros
-            s = ("%g" % float(v))
-            return s
-        except Exception:
-            return "1"
 
     # Do not modify positive prompt with <lora:...> tokens; keep as-is
     new_positive = (positive or "").strip()
@@ -129,4 +129,54 @@ def build_a1111_with_hashes(
         scheduler=None,  # already encoded in sampler_pretty if applicable
         clip_skip=ov.get("clip_skip"),
     )
-    return a1111_params, model_name, loras
+    return a1111_params, model_name, loras, lora_weights
+
+
+def build_eagle_annotation(
+    positive: str,
+    negative: str | None,
+    width: int,
+    height: int,
+    model_name: str | None,
+    loras: List[str] | None = None,
+    lora_weights: Dict[str, float] | None = None,
+    overrides: Dict[str, Any] | None = None,
+    memo_text: str | None = None,
+) -> str:
+    ov = overrides or {}
+    pos = (positive or "").strip()
+    neg = (negative or "").strip()
+    steps = ov.get("steps") if isinstance(ov.get("steps"), int) else 0
+    cfg = ov.get("cfg_scale") if isinstance(ov.get("cfg_scale"), (int, float)) else 0
+    seed = ov.get("seed") if isinstance(ov.get("seed"), int) else 0
+    sampler = str(ov.get("sampler_name") or "").strip()
+    scheduler = str(ov.get("scheduler") or "").strip()
+    clip_skip = ov.get("clip_skip") if isinstance(ov.get("clip_skip"), int) else None
+    model = model_name or ""
+    lines: list[str] = []
+    # Positive
+    lines.append(pos)
+    lines.append("")
+    # Negative (ensure trailing newline after the line)
+    lines.append(f"Negative prompt:{neg}")
+    # Model immediately after Negative
+    lines.append(f"Model: {model}")
+    # LoRA weighted list
+    if loras:
+        lw = lora_weights or {}
+        for ln in loras:
+            if ln in lw:
+                lines.append(f"LoRA: {ln} ({_fmt_weight(lw[ln])})")
+            else:
+                lines.append(f"LoRA: {ln}")
+    # Empty line separator
+    lines.append("")
+    # Remaining parameters
+    tail = f"Steps: {steps}, Sampler: {sampler} {scheduler}, CFG scale: {cfg}, Seed: {seed}, Size: {width}x{height}"
+    if clip_skip is not None:
+        tail += f", Clip skip: {abs(clip_skip)}"
+    lines.append(tail)
+    if memo_text and memo_text.strip():
+        lines.append("")
+        lines.append(f"Memo: {memo_text.strip()}")
+    return "\n".join(lines)
