@@ -17,7 +17,7 @@ def build_parameters(
     segs: list[str] = [
         "Steps: 0",
         "Sampler: ",
-        "CFG scale: 0",
+        "CFG Scale: 0",
         "Seed: 0",
         f"Size: {width}x{height}",
     ]

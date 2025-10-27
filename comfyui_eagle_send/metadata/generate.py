@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from typing import Any, Dict, List, Tuple
 
 from ..parsing.workflow import parse_workflow_resources
@@ -24,6 +25,7 @@ def build_a1111_with_hashes(
     resources = parse_workflow_resources(extra_pnginfo)
     model_name = resources.get("model_name") or ""
     loras = resources.get("loras") or []
+    lora_weights = resources.get("lora_weights") or {}
 
     model_hash_short = ""
     if model_name:
@@ -46,8 +48,19 @@ def build_a1111_with_hashes(
         except Exception:
             pass
 
+    def _fmt_weight(v: float) -> str:
+        try:
+            # Trim trailing zeros
+            s = ("%g" % float(v))
+            return s
+        except Exception:
+            return "1"
+
+    # Do not modify positive prompt with <lora:...> tokens; keep as-is
+    new_positive = (positive or "").strip()
+
     a1111_params = build_parameters(
-        positive=positive or "",
+        positive=new_positive,
         width=width,
         height=height,
         model_basename=model_name or "",
@@ -55,4 +68,3 @@ def build_a1111_with_hashes(
         hashes=hashes_dict or None,
     )
     return a1111_params, model_name, loras
-

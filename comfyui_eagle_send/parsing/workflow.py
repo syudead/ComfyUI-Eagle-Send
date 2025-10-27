@@ -44,7 +44,7 @@ def _normalize_name_drop_ext(name: str) -> str:
 
 
 def parse_workflow_resources(extra_pnginfo: Any) -> Dict[str, Any]:
-    result = {"model_name": "", "loras": []}
+    result: Dict[str, Any] = {"model_name": "", "loras": [], "lora_weights": {}}
     if not isinstance(extra_pnginfo, dict):
         return result
     wf = extra_pnginfo.get("workflow")
@@ -59,6 +59,7 @@ def parse_workflow_resources(extra_pnginfo: Any) -> Dict[str, Any]:
 
     model_found = False
     lora_names: List[str] = []
+    lora_weights: Dict[str, float] = {}
 
     for node in nodes:
         if bool(node.get("disabled")) or bool(node.get("bypass")):
@@ -84,7 +85,13 @@ def parse_workflow_resources(extra_pnginfo: Any) -> Dict[str, Any]:
                             if val.get("on") is True and isinstance(val.get("lora"), str):
                                 nm = val.get("lora").strip()
                                 if nm:
-                                    lora_names.append(_normalize_name_drop_ext(nm))
+                                    base = _normalize_name_drop_ext(nm)
+                                    lora_names.append(base)
+                                    try:
+                                        if isinstance(val.get("strength"), (int, float)):
+                                            lora_weights[base] = float(val.get("strength"))
+                                    except Exception:
+                                        pass
                                     handled = True
                 if not handled:
                     wv = node.get("widgets_values")
@@ -93,13 +100,31 @@ def parse_workflow_resources(extra_pnginfo: Any) -> Dict[str, Any]:
                             if isinstance(entry, dict) and entry.get("on") is True and isinstance(entry.get("lora"), str):
                                 nm = entry.get("lora").strip()
                                 if nm:
-                                    lora_names.append(_normalize_name_drop_ext(nm))
+                                    base = _normalize_name_drop_ext(nm)
+                                    lora_names.append(base)
+                                    try:
+                                        if isinstance(entry.get("strength"), (int, float)):
+                                            lora_weights[base] = float(entry.get("strength"))
+                                    except Exception:
+                                        pass
             else:
                 v = inp.get("lora_name") if isinstance(inp, dict) else None
                 if isinstance(v, str):
                     nm = v.strip()
                     if nm:
-                        lora_names.append(_normalize_name_drop_ext(nm))
+                        base = _normalize_name_drop_ext(nm)
+                        lora_names.append(base)
+                        # Try common strength keys for standard loaders
+                        try:
+                            strength = None
+                            for k in ("strength", "strength_model", "strength_clip"):
+                                if isinstance(inp.get(k), (int, float)):
+                                    strength = float(inp.get(k))
+                                    break
+                            if strength is not None:
+                                lora_weights[base] = strength
+                        except Exception:
+                            pass
 
     seen = set()
     uniq_loras = []
@@ -108,5 +133,6 @@ def parse_workflow_resources(extra_pnginfo: Any) -> Dict[str, Any]:
             uniq_loras.append(n)
             seen.add(n)
     result["loras"] = uniq_loras
+    # Keep only weights for detected unique names
+    result["lora_weights"] = {n: lora_weights[n] for n in uniq_loras if n in lora_weights}
     return result
-
