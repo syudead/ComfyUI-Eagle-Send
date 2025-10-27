@@ -11,6 +11,7 @@ def save_images_output(
     filename_prefix: str,
     prompt: str | None,
     extra_pnginfo: Dict[str, Any] | None,
+    a1111_params: str | None = None,
 ) -> List[str]:
     paths: List[str] = []
     if not pil_images:
@@ -26,14 +27,22 @@ def save_images_output(
         from PIL.PngImagePlugin import PngInfo  # type: ignore
 
         pnginfo = PngInfo()
-        if isinstance(prompt, str) and prompt.strip():
-            pnginfo.add_text("parameters", prompt)
+        # parameters: prefer A1111 string if provided; fallback to raw prompt
+        params_text = a1111_params if (isinstance(a1111_params, str) and a1111_params.strip()) else (prompt or "")
+        if params_text:
+            pnginfo.add_text("parameters", params_text)
         if isinstance(extra_pnginfo, dict):
             for key, val in extra_pnginfo.items():
                 try:
                     pnginfo.add_text(key, json.dumps(val))
                 except Exception:
                     pass
+        # Also keep original prompt JSON for tools that read it
+        try:
+            if isinstance(prompt, str):
+                pnginfo.add_text("prompt", json.dumps(prompt))
+        except Exception:
+            pass
     except Exception:
         pnginfo = None
 
@@ -53,4 +62,3 @@ def save_images_output(
             pil_image.save(save_path, format="PNG")
         paths.append(save_path)
     return paths
-
