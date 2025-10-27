@@ -25,6 +25,15 @@ Notes
 - Payload strictly follows Eagle API JSON for `addFromPaths`: `{ "items": [{ "path": "...", "tags": ["..."] }] }`.
 - Eagle host is read from `EAGLE_API_HOST` environment variable if set; otherwise defaults to `http://127.0.0.1:41595`.
 
+Project layout (refactor)
+- `comfyui_eagle_send/nodes/eagle_send.py` – Node definition (thin)
+- `comfyui_eagle_send/image/tensor_convert.py` – IMAGE tensor to PIL
+- `comfyui_eagle_send/image/save.py` – Save PNG and embed metadata
+- `comfyui_eagle_send/parsing/tags.py` – Prompt-to-tags
+- `comfyui_eagle_send/parsing/workflow.py` – Model/LoRA extraction
+- `comfyui_eagle_send/eagle/api.py` – Eagle `addFromPaths` client
+- `comfyui_eagle_send/config.py` – Host configuration
+
 Troubleshooting
 - Verify Eagle is running and the API is enabled (default port 41595).
 - Check ComfyUI console for the `HTTP <code>` and response body returned by Eagle.
