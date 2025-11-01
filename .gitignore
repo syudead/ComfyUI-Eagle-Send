@@ -28,3 +28,5 @@ Thumbs.db
 *.tmp
 tmp/
 
+# Plugin cache
+comfyui_eagle_send/hash_cache.json

@@ -32,7 +32,7 @@ Custom node for ComfyUI that saves generated images and sends them to the Eagle 
 Required
 - `images: IMAGE`
   - ComfyUI image tensor. Passed through unchanged on output and converted to PNG when saving.
-- `filename_prefix: STRING` (default: `ComfyUI/EagleSend`)
+- `filename_prefix: STRING` (default: `ComfyUI`)
   - Prefix used with ComfyUI's output naming (via `folder_paths.get_save_image_path`).
 - `prompt: STRING`
   - Positive prompt text. Used for tag generation, parameters text, and Eagle memo.

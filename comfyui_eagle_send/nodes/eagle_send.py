@@ -12,12 +12,13 @@ from ..eagle.api import send_to_eagle
 
 
 class EagleSend:
+    OUTPUT_NODE = True
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "images": ("IMAGE",),
-                "filename_prefix": ("STRING", {"default": "ComfyUI/EagleSend"}),
+                "filename_prefix": ("STRING", {"default": "ComfyUI"}),
                 "prompt": ("STRING", {"default": "", "multiline": True, "forceInput": True}),
             },
             "optional": {
