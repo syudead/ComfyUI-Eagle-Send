@@ -34,6 +34,8 @@ Required
   - ComfyUI image tensor. Passed through unchanged on output and converted to PNG when saving.
 - `filename_prefix: STRING` (default: `ComfyUI`)
   - Prefix used with ComfyUI's output naming (via `folder_paths.get_save_image_path`).
+  - Supports a single datetime token: `%datetime%` → expands to `yyyymmdd_HHmmss`.
+    - Example: `ComfyUI_%datetime%` → `ComfyUI_20251213_024501`
 - `prompt: STRING`
   - Positive prompt text. Used for tag generation, parameters text, and Eagle memo.
 

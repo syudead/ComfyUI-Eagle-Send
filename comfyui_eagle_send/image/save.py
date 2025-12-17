@@ -2,8 +2,19 @@ from __future__ import annotations
 import os
 import json
 from typing import Any, Dict, List
+from datetime import datetime
 
 import folder_paths  # ComfyUI helper
+
+
+def _apply_datetime_token(prefix: str) -> str:
+    """Replace a single supported datetime token with yyyymmdd_HHmmss.
+
+    Supported token: %datetime%
+    Any other %...% tokens (e.g. %batch_num%) are left unchanged.
+    """
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return prefix.replace("%datetime%", ts)
 
 
 def save_images_output(
@@ -17,6 +28,8 @@ def save_images_output(
     if not pil_images:
         return paths
     output_dir = folder_paths.get_output_directory()
+    # Expand our minimal datetime token before delegating to ComfyUI's naming
+    filename_prefix = _apply_datetime_token(str(filename_prefix or ""))
     width, height = pil_images[0].size
     full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
         filename_prefix, output_dir, width, height
