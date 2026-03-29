@@ -77,7 +77,7 @@ class EagleSend:
             except Exception:
                 ov = {}
 
-            a1111_params, model_name, loras, lora_weights = build_a1111_with_hashes(
+            a1111_params, model_name, loras, lora_weights, clip_names, vae_name = build_a1111_with_hashes(
                 positive=prompt or "",
                 negative=negative or "",
                 width=width,
@@ -96,7 +96,7 @@ class EagleSend:
         host = get_eagle_host()
         tags = prompt_to_tags(prompt)
 
-        # add model/lora from workflow (EXTRA_PNGINFO)
+        # add model/lora/clip/vae from workflow (EXTRA_PNGINFO)
         if model_name:
             tag_model = f"model:{model_name}"
             if tag_model not in tags:
@@ -105,6 +105,14 @@ class EagleSend:
             tag_lora = f"lora:{ln}"
             if tag_lora not in tags:
                 tags.append(tag_lora)
+        for cn in clip_names:
+            tag_clip = f"clip:{cn}"
+            if tag_clip not in tags:
+                tags.append(tag_clip)
+        if vae_name:
+            tag_vae = f"vae:{vae_name}"
+            if tag_vae not in tags:
+                tags.append(tag_vae)
 
         # Build Eagle memo (annotation) for Eagle
         try:
@@ -117,6 +125,8 @@ class EagleSend:
                 model_name=model_name,
                 loras=loras,
                 lora_weights=lora_weights,
+                clip_names=clip_names,
+                vae_name=vae_name,
                 overrides=ov or None,
                 memo_text=None,
             )

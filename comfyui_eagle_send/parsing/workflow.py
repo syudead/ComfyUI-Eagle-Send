@@ -5,6 +5,8 @@ from typing import Any, Dict, List
 
 MODEL_NODE_TYPES = {"CheckpointLoaderSimple", "CheckpointLoader"}
 UNET_NODE_TYPES = {"UNETLoader"}
+CLIP_NODE_TYPES = {"CLIPLoader", "DualCLIPLoader"}
+VAE_NODE_TYPES = {"VAELoader"}
 LORA_NODE_TYPES = {
     "LoraLoader",
     "LoraLoaderModelOnly",
@@ -45,7 +47,7 @@ def _normalize_name_drop_ext(name: str) -> str:
 
 
 def parse_workflow_resources(extra_pnginfo: Any) -> Dict[str, Any]:
-    result: Dict[str, Any] = {"model_name": "", "loras": [], "lora_weights": {}}
+    result: Dict[str, Any] = {"model_name": "", "loras": [], "lora_weights": {}, "clip_names": [], "vae_name": ""}
     if not isinstance(extra_pnginfo, dict):
         return result
     wf = extra_pnginfo.get("workflow")
@@ -86,6 +88,36 @@ def parse_workflow_resources(extra_pnginfo: Any) -> Dict[str, Any]:
                 if isinstance(wv, list) and wv and isinstance(wv[0], str) and wv[0].strip():
                     result["model_name"] = _normalize_name_drop_ext(wv[0])
                     model_found = True
+        elif t in CLIP_NODE_TYPES:
+            inp = node.get("inputs", {}) or {}
+            if t == "DualCLIPLoader":
+                for key in ("clip_name1", "clip_name2"):
+                    v = inp.get(key) if isinstance(inp, dict) else None
+                    if not isinstance(v, str):
+                        wv = node.get("widgets_values")
+                        idx = 0 if key == "clip_name1" else 1
+                        v = wv[idx] if isinstance(wv, list) and len(wv) > idx else None
+                    if isinstance(v, str) and v.strip():
+                        nm = _normalize_name_drop_ext(v)
+                        if nm and nm not in result["clip_names"]:
+                            result["clip_names"].append(nm)
+            else:
+                v = inp.get("clip_name") if isinstance(inp, dict) else None
+                if not isinstance(v, str):
+                    wv = node.get("widgets_values")
+                    v = wv[0] if isinstance(wv, list) and wv else None
+                if isinstance(v, str) and v.strip():
+                    nm = _normalize_name_drop_ext(v)
+                    if nm and nm not in result["clip_names"]:
+                        result["clip_names"].append(nm)
+        elif t in VAE_NODE_TYPES and not result["vae_name"]:
+            inp = node.get("inputs", {}) or {}
+            v = inp.get("vae_name") if isinstance(inp, dict) else None
+            if not isinstance(v, str):
+                wv = node.get("widgets_values")
+                v = wv[0] if isinstance(wv, list) and wv else None
+            if isinstance(v, str) and v.strip():
+                result["vae_name"] = _normalize_name_drop_ext(v)
         elif t in LORA_NODE_TYPES:
             inp = node.get("inputs", {}) or {}
             if t == "Power Lora Loader (rgthree)":

@@ -8,6 +8,8 @@ from ..hash.compute import (
     short10,
     resolve_checkpoint_by_basename,
     resolve_unet_by_basename,
+    resolve_clip_by_basename,
+    resolve_vae_by_basename,
     resolve_loras_by_basenames,
 )
 from ..image.a1111 import build_parameters
@@ -27,15 +29,17 @@ def build_a1111_with_hashes(
     height: int,
     extra_pnginfo: Any,
     overrides: Dict[str, Any] | None = None,
-) -> Tuple[str, str, List[str], Dict[str, float]]:
+) -> Tuple[str, str, List[str], Dict[str, float], List[str], str]:
     """Construct A1111 parameters string with model/LoRA short hashes.
 
-    Returns (a1111_params, model_name, loras)
+    Returns (a1111_params, model_name, loras, lora_weights, clip_names, vae_name)
     """
     resources = parse_workflow_resources(extra_pnginfo)
     model_name = resources.get("model_name") or ""
     loras = resources.get("loras") or []
     lora_weights = resources.get("lora_weights") or {}
+    clip_names: List[str] = resources.get("clip_names") or []
+    vae_name: str = resources.get("vae_name") or ""
 
     model_hash_short = ""
     if model_name:
@@ -59,6 +63,24 @@ def build_a1111_with_hashes(
                 hashes_dict[f"LORA:{ln}"] = h
         except Exception:
             pass
+    for cn in clip_names:
+        cp = resolve_clip_by_basename(cn)
+        if cp:
+            try:
+                h = short10(calculate_sha256(cp))
+                if h:
+                    hashes_dict[f"CLIP:{cn}"] = h
+            except Exception:
+                pass
+    if vae_name:
+        vp = resolve_vae_by_basename(vae_name)
+        if vp:
+            try:
+                h = short10(calculate_sha256(vp))
+                if h:
+                    hashes_dict[f"VAE:{vae_name}"] = h
+            except Exception:
+                pass
 
 
     # Do not modify positive prompt with <lora:...> tokens; keep as-is
@@ -132,7 +154,7 @@ def build_a1111_with_hashes(
         scheduler=None,  # already encoded in sampler_pretty if applicable
         clip_skip=ov.get("clip_skip"),
     )
-    return a1111_params, model_name, loras, lora_weights
+    return a1111_params, model_name, loras, lora_weights, clip_names, vae_name
 
 
 def build_eagle_annotation(
@@ -143,6 +165,8 @@ def build_eagle_annotation(
     model_name: str | None,
     loras: List[str] | None = None,
     lora_weights: Dict[str, float] | None = None,
+    clip_names: List[str] | None = None,
+    vae_name: str | None = None,
     overrides: Dict[str, Any] | None = None,
     memo_text: str | None = None,
 ) -> str:
@@ -162,7 +186,8 @@ def build_eagle_annotation(
     lines.append("")
     # Negative (ensure trailing newline after the line)
     lines.append(f"Negative prompt:{neg}")
-    # Model immediately after Negative
+    lines.append("")
+    # Model
     lines.append(f"Model: {model}")
     # LoRA weighted list
     if loras:
@@ -172,6 +197,13 @@ def build_eagle_annotation(
                 lines.append(f"LoRA: {ln} ({_fmt_weight(lw[ln])})")
             else:
                 lines.append(f"LoRA: {ln}")
+    # CLIP models
+    if clip_names:
+        for cn in clip_names:
+            lines.append(f"CLIP: {cn}")
+    # VAE
+    if vae_name:
+        lines.append(f"VAE: {vae_name}")
     # Empty line separator
     lines.append("")
     # Remaining parameters
