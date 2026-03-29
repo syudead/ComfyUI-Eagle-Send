@@ -7,6 +7,7 @@ from ..hash.compute import (
     calculate_sha256,
     short10,
     resolve_checkpoint_by_basename,
+    resolve_unet_by_basename,
     resolve_loras_by_basenames,
 )
 from ..image.a1111 import build_parameters
@@ -39,6 +40,8 @@ def build_a1111_with_hashes(
     model_hash_short = ""
     if model_name:
         ckpt_path = resolve_checkpoint_by_basename(model_name)
+        if not ckpt_path:
+            ckpt_path = resolve_unet_by_basename(model_name)
         if ckpt_path:
             try:
                 model_hash_short = short10(calculate_sha256(ckpt_path))

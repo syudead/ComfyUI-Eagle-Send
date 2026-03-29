@@ -148,6 +148,18 @@ def resolve_checkpoint_by_basename(model_basename: str) -> Optional[str]:
     return None
 
 
+def resolve_unet_by_basename(model_basename: str) -> Optional[str]:
+    try:
+        names = folder_paths.get_filename_list("diffusion_models")
+        b = model_basename.lower()
+        for n in names:
+            if _basename_no_ext(n).lower() == b:
+                return folder_paths.get_full_path("diffusion_models", n)
+    except Exception:
+        pass
+    return None
+
+
 def resolve_loras_by_basenames(lora_basenames: list[str]) -> Dict[str, str]:
     out: Dict[str, str] = {}
     try:

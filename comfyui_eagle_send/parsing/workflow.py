@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 
 
 MODEL_NODE_TYPES = {"CheckpointLoaderSimple", "CheckpointLoader"}
+UNET_NODE_TYPES = {"UNETLoader"}
 LORA_NODE_TYPES = {
     "LoraLoader",
     "LoraLoaderModelOnly",
@@ -67,6 +68,16 @@ def parse_workflow_resources(extra_pnginfo: Any) -> Dict[str, Any]:
         t = node.get("type")
         if t in MODEL_NODE_TYPES and not model_found:
             v = _value_from_inputs(node, "ckpt_name")
+            if isinstance(v, str) and v.strip():
+                result["model_name"] = _normalize_name_drop_ext(v)
+                model_found = True
+            else:
+                wv = node.get("widgets_values")
+                if isinstance(wv, list) and wv and isinstance(wv[0], str) and wv[0].strip():
+                    result["model_name"] = _normalize_name_drop_ext(wv[0])
+                    model_found = True
+        elif t in UNET_NODE_TYPES and not model_found:
+            v = _value_from_inputs(node, "unet_name")
             if isinstance(v, str) and v.strip():
                 result["model_name"] = _normalize_name_drop_ext(v)
                 model_found = True
